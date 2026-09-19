@@ -315,6 +315,25 @@ jobs:
             ;;
           *gnu | *gnueabihf)
             if [ "${DPKG_ARCH}" != "amd64" ]; then
+              if [[ "${DPKG_ARCH}" == "arm64" || "${DPKG_ARCH}" == "armhf" ]]; then
+                . /etc/os-release
+                UBUNTU_SOURCES=/etc/apt/sources.list.d/ubuntu.sources
+                test -f "${UBUNTU_SOURCES}"
+
+                # Ubuntu's normal archive serves amd64/i386; ARM lives in Ubuntu Ports.
+                if grep -q '^Architectures:' "${UBUNTU_SOURCES}"; then
+                  sudo sed -i 's/^Architectures:.*/Architectures: amd64 i386/' "${UBUNTU_SOURCES}"
+                else
+                  sudo sed -i '/^Types: deb$/a Architectures: amd64 i386' "${UBUNTU_SOURCES}"
+                fi
+                grep -q '^Architectures: amd64 i386$' "${UBUNTU_SOURCES}"
+
+                PORTS_LIST=/etc/apt/sources.list.d/numbat-ports.list
+                for SUITE in "${VERSION_CODENAME}" "${VERSION_CODENAME}-updates" "${VERSION_CODENAME}-backports" "${VERSION_CODENAME}-security"; do
+                  printf 'deb [arch=%s signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://ports.ubuntu.com/ubuntu-ports %s main restricted universe multiverse\n' "${DPKG_ARCH}" "${SUITE}"
+                done | sudo tee "${PORTS_LIST}" >/dev/null
+              fi
+
               sudo dpkg --add-architecture "${DPKG_ARCH}"
               sudo apt-get update
               sudo apt-get install -y "libc6:${DPKG_ARCH}" "libgcc-s1:${DPKG_ARCH}"
