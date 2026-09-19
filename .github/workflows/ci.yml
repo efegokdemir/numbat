@@ -322,10 +322,14 @@ jobs:
 
             # dpkg-shlibdeps requires a Debian control file even with -O.
             mkdir -p "${DPKG_STAGING}/debian"
-            printf 'Source: %s\\nMaintainer: %s\\n\\nPackage: %s\\nArchitecture: any\\nDescription: Numbat dependency analysis\\n' \\
-              "${{ needs.crate_metadata.outputs.name }}" \\
-              "${{ needs.crate_metadata.outputs.maintainer }}" \\
-              "${DPKG_BASENAME}" > "${DPKG_STAGING}/debian/control"
+            cat > "${DPKG_STAGING}/debian/control" <<EOF
+        Source: ${{ needs.crate_metadata.outputs.name }}
+        Maintainer: ${{ needs.crate_metadata.outputs.maintainer }}
+
+        Package: ${DPKG_BASENAME}
+        Architecture: any
+        Description: Numbat dependency analysis
+        EOF
 
             DPKG_SHLIBDEPS="$(
               cd "${DPKG_STAGING}"
@@ -422,7 +426,7 @@ jobs:
         EOF
 
         if [ -n "${DPKG_DEPENDS}" ]; then
-          printf 'Depends: %s\\n' "${DPKG_DEPENDS}" >> "${DPKG_DIR}/DEBIAN/control"
+          echo "Depends: ${DPKG_DEPENDS}" >> "${DPKG_DIR}/DEBIAN/control"
         fi
 
         DPKG_PATH="${DPKG_STAGING}/${DPKG_NAME}"
