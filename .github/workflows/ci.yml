@@ -296,7 +296,7 @@ jobs:
         case ${{ matrix.job.target }} in
           aarch64-*-linux-*) DPKG_ARCH=arm64 ;;
           arm-*-linux-*hf) DPKG_ARCH=armhf ;;
-          i686-*-linux-*) DPKG_ARCH=i686 ;;
+          i686-*-linux-*) DPKG_ARCH=i386 ;;
           x86_64-*-linux-*) DPKG_ARCH=amd64 ;;
           *) DPKG_ARCH=notset ;;
         esac;
@@ -306,6 +306,47 @@ jobs:
 
         # Binary
         install -Dm755 "${{ steps.bin.outputs.BIN_PATH }}" "${DPKG_DIR}/usr/bin/${{ steps.bin.outputs.BIN_NAME }}"
+
+        # Generate versioned runtime dependencies for dynamically linked GNU builds.
+        # Static musl packages must not acquire a glibc dependency.
+        DPKG_DEPENDS=""
+        case "${{ matrix.job.target }}" in
+          *musl*)
+            ;;
+          *gnu | *gnueabihf)
+            if [ "${DPKG_ARCH}" != "amd64" ]; then
+              sudo dpkg --add-architecture "${DPKG_ARCH}"
+              sudo apt-get update
+              sudo apt-get install -y "libc6:${DPKG_ARCH}" "libgcc-s1:${DPKG_ARCH}"
+            fi
+
+            # dpkg-shlibdeps requires a Debian control file even with -O.
+            mkdir -p "${DPKG_STAGING}/debian"
+            printf 'Source: %s\\nMaintainer: %s\\n\\nPackage: %s\\nArchitecture: any\\nDescription: Numbat dependency analysis\\n' \\
+              "${{ needs.crate_metadata.outputs.name }}" \\
+              "${{ needs.crate_metadata.outputs.maintainer }}" \\
+              "${DPKG_BASENAME}" > "${DPKG_STAGING}/debian/control"
+
+            DPKG_SHLIBDEPS="$(
+              cd "${DPKG_STAGING}"
+              dpkg-shlibdeps -O -e "dpkg/usr/bin/${{ steps.bin.outputs.BIN_NAME }}"
+            )"
+
+            case "${DPKG_SHLIBDEPS}" in
+              shlibs:Depends=*) DPKG_DEPENDS="${DPKG_SHLIBDEPS#shlibs:Depends=}" ;;
+              *) echo "Unexpected dpkg-shlibdeps output: ${DPKG_SHLIBDEPS}" >&2; exit 1 ;;
+            esac
+
+            if [[ "${DPKG_DEPENDS}" != *libc6* ]]; then
+              echo "Missing libc6 dependency: ${DPKG_DEPENDS}" >&2
+              exit 1
+            fi
+            ;;
+          *)
+            echo "Unexpected Linux target: ${{ matrix.job.target }}" >&2
+            exit 1
+            ;;
+        esac
 
         # README and LICENSE
         install -Dm644 "README.md" "${DPKG_DIR}/usr/share/doc/${DPKG_BASENAME}/README.md"
@@ -380,11 +421,24 @@ jobs:
         Description:  Statically typed programming language for scientific computations with first class support for physical dimensions and units
         EOF
 
+        if [ -n "${DPKG_DEPENDS}" ]; then
+          printf 'Depends: %s\\n' "${DPKG_DEPENDS}" >> "${DPKG_DIR}/DEBIAN/control"
+        fi
+
         DPKG_PATH="${DPKG_STAGING}/${DPKG_NAME}"
         echo "DPKG_PATH=${DPKG_PATH}" >> $GITHUB_OUTPUT
 
         # build dpkg
         fakeroot dpkg-deb --build "${DPKG_DIR}" "${DPKG_PATH}"
+
+        # Verify the dependency field in the actual packaged artifact.
+        ACTUAL_DEPENDS="$(dpkg-deb --field "${DPKG_PATH}" Depends)"
+        if [ "${ACTUAL_DEPENDS}" != "${DPKG_DEPENDS}" ]; then
+          echo "Package dependencies do not match generated dependencies." >&2
+          echo "Expected: ${DPKG_DEPENDS}" >&2
+          echo "Actual: ${ACTUAL_DEPENDS}" >&2
+          exit 1
+        fi
 
     - name: "Artifact upload: tarball"
       uses: actions/upload-artifact@master
