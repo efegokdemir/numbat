@@ -20,7 +20,7 @@ or misrepresented, please [let us know](https://github.com/sharkdp/numbat/issues
 | Custom units                           | ✓               | ✓         | ❌    | ✓         | ✓     | ❌             | ✓ |
 | Physical dimensions                    | ✓               | ❌        | ❌    | ❌         | ❌     | ❌             | ? |
 | Currency conversions                   | ✓               | ✓         | ❌    | ❌         | ✓     | ✓             | ✓ |
-| Date and time calculations             | ✓               | ✓         | ❌    | ❌         | ✓     | ✓             | ✓ |
+| Date and time calculations             | ✓               | ✓         | ❌    | ❌         | ✓     | ✓             | (✓) |
 | **Language features**                  |                 |           |        |           |       |               |  |
 | Custom functions                       | ✓               | ✓        | ✓     | ❌         | ✓     | ❌             | ✓ |
 | Real programming language              | ✓               | ❌        | ❌     | ❌         | ✓     | ?             | ? |
@@ -37,8 +37,10 @@ or misrepresented, please [let us know](https://github.com/sharkdp/numbat/issues
   calculator with command-line and web interfaces. It supports unit
   conversions, custom units, complex numbers, dates, and lambda
   functions. Features marked `?` in its column need further verification
-  against the comparison criteria. Exact fraction output alone does not
-  establish general symbolic algebra support.
+  against the comparison criteria. The Fend manual documents date arithmetic
+  but not time-of-day or time-zone calculations, so that row is marked as
+  partial. Exact fraction output alone does not establish general symbolic
+  algebra support.
 
 - [Qalculate](https://qalculate.github.io/) is a fantastic calculator with a strong support for units and conversions.
   If you don't need the full power of a programming language, Qalculate is probably more feature-complete than Numbat.
